@@ -7,9 +7,11 @@ import { history, Link } from '@umijs/max';
 import defaultSettings from '../config/defaultSettings';
 import { errorConfig } from './requestErrorConfig';
 import { clearSessionToken, getAccessToken, getRefreshToken, getTokenExpireTime } from './access';
-import { getRemoteMenu, getRoutersInfo, getUserInfo, patchRouteWithRemoteMenus, setRemoteMenu } from './services/session';
+// 修改导入语句，移除不存在的setRemoteMenu函数
+import { getRemoteMenu, getRoutersInfo, getUserInfo, patchRouteWithRemoteMenus } from './services/session';
 import { PageEnum } from './enums/pagesEnums';
-import routes from 'config/routes';
+// 修改导入路径，使用正确的相对路径
+import routes from '../config/routes';
 
 
 const isDev = process.env.NODE_ENV === 'development';
@@ -75,18 +77,35 @@ export const layout: RunTimeLayoutConfig = ({ initialState, setInitialState }) =
     waterMarkProps: {
       // content: initialState?.currentUser?.nickName,
     },
+    // 修改 layout.menu.request 配置
     menu: {
-      locale: false,
-      // 每当 initialState?.currentUser?.userid 发生修改时重新执行 request
-      params: {
-        userId: initialState?.currentUser?.userId,
-      },
-      request: async () => {
-        if (!initialState?.currentUser?.userId) {
-          return [];
-        }
-        return getRemoteMenu();
-      },
+    locale: false,
+    // 每当 initialState?.currentUser?.userid 发生修改时重新执行 request
+    params: {
+      userId: initialState?.currentUser?.userId,
+    },
+    request: async () => {
+      if (!initialState?.currentUser?.userId) {
+        return [];
+      }
+      
+      // 获取远程菜单
+      const remoteMenus = getRemoteMenu();
+      
+      // 如果远程菜单为null，使用本地routes配置作为菜单
+      if (remoteMenus === null) {
+        console.log('使用本地路由配置作为菜单');
+        // 将routes转换为ProLayout需要的菜单格式
+        return routes.map(route => ({
+          path: route.path,
+          name: route.name,
+          icon: route.icon,
+          routes: route.routes || []
+        })).filter(menu => menu.path !== '*'); // 过滤掉404路由
+      }
+      
+      return remoteMenus;
+    },
     },
     footerRender: () => <Footer />,
     onPageChange: () => {
@@ -155,43 +174,39 @@ interface OnRouteChangeParams {
   clientRoutes: any[]; 
   location: Location;
 }
+// 优化 onRouteChange 函数，移除不必要的整页刷新
 export async function onRouteChange({ clientRoutes, location }:OnRouteChangeParams ) {
-
-  const menus = getRemoteMenu();
-//  console.log('onRouteChange', clientRoutes);
-  if(menus === null && location.pathname !== PageEnum.LOGIN) {
-    console.log('refresh')
-    history.go(0);
-  }
-  location.pathname
+  // 移除对远程菜单为null的检查
+  // const menus = getRemoteMenu();
+  // if(menus === null && location.pathname !== PageEnum.LOGIN) {
+  //   console.log('远程菜单未加载，但不再强制刷新页面');
+  // }
+  
+  // 保留模型切换逻辑，但移除整页刷新
   const curModel = localStorage.getItem('curModel');
   const pathSegments = location.pathname.split('/').filter(Boolean);
   const firstPathName = pathSegments.length > 0 ? pathSegments[0] : '';
-  if (firstPathName.length>0 && firstPathName !== curModel) {
-    localStorage.setItem('curModel',firstPathName)
-    window.location.reload(); 
-    
-  }
   
-}
-
-
-export async function patchClientRoutes({ routes }:any) {
-  // console.log('patchClientRoutes', routes);
-  patchRouteWithRemoteMenus(routes);
-}
-
-export function render(oldRender: () => void) {
-  // console.log("render",history.location)
-  const token = getAccessToken();
-  if(!token || token?.length === 0) {
-    oldRender();
-    return;
+  if (firstPathName.length>0 && firstPathName !== curModel) {
+    localStorage.setItem('curModel', firstPathName);
+    console.log('模型切换为:', firstPathName);
   }
-  getRoutersInfo().then(res => {
-    setRemoteMenu(res);
-    oldRender()
-  });
+}
+
+
+// 修改 patchClientRoutes 函数，要么移除它，要么正确返回路由
+// 方案1：完全移除该函数（推荐，让UmiJS使用默认路由配置）
+
+// 方案2：如果需要保留该函数，至少要返回原始路由
+// export async function patchClientRoutes({ routes }:any) {
+//   console.log('使用 UmiJS 默认路由配置');
+//   return routes; // 重要：必须返回路由配置
+// }
+
+// 简化 render 函数
+export function render(oldRender: () => void) {
+// 直接调用 oldRender，让 UmiJS 使用默认的路由配置
+oldRender();
 }
 
 /**

@@ -16,6 +16,7 @@ body,
 .ant-layout {
   min-height: 100vh;
 }
+
 .ant-pro-sider.ant-layout-sider.ant-pro-sider-fixed {
   left: unset;
 }
@@ -50,4 +51,23 @@ ol {
       }
     }
   }
+}
+
+/* 自定义滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }

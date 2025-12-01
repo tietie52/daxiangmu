@@ -5,18 +5,20 @@ import homeJpeg from '@/pages/home/home.jpeg';
 import { history } from 'umi'; 
 
 const HomePage = () => {
-    const navigateToBasicInfo = (pathname: string) => {
-        localStorage.setItem('curpath', pathname);
-        history.push('/'+pathname);
+    // 修改导航函数，使用已定义的有效路由
+    const navigateToValidRoute = (route: string) => {
+        localStorage.setItem('curpath', route);
+        history.push(route);
     };
 
+    // 然后修改各个按钮的onClick事件
     return (
         <div className={styles.container} style={{ backgroundImage: `url(${homeJpeg})` }}>
             <div className={styles.title}>软件开发前后端融合学习平台</div>
             <div className={styles.menuGrid}>
                 {/* 左上：基础信息管理 */}
                 <div className={`${styles.menuItem} ${styles.topLeft}`}>
-                    <button onClick={() => navigateToBasicInfo("basic-info")} className={styles.menuButton}>
+                    <button onClick={() => navigateToValidRoute("/display/message-list")} className={styles.menuButton}>
                         <FileTextOutlined style={{ fontSize: '5rem' }} />
                         <div>基础信息管理</div>
                     </button>
@@ -24,7 +26,7 @@ const HomePage = () => {
 
                 {/* 中间：业务操作管理 */}
                 <div className={`${styles.menuItem} ${styles.center}`}>
-                    <button onClick={() => navigateToBasicInfo("warehouse-mng")} className={styles.menuButton}>
+                    <button onClick={() => navigateToValidRoute("/dashboard")} className={styles.menuButton}>
                         <SettingOutlined style={{ fontSize: '6rem' }} />
                         <div>业务操作管理</div>
                     </button>
@@ -32,7 +34,7 @@ const HomePage = () => {
 
                 {/* 右上：可视化查询管理 */}
                 <div className={`${styles.menuItem} ${styles.topRight}`}>
-                    <button onClick={() => navigateToBasicInfo("warehouse-mng")} className={styles.menuButton}>
+                    <button onClick={() => navigateToValidRoute("/form/basic")} className={styles.menuButton}>
                         <TableOutlined style={{ fontSize: '5rem' }} />
                         <div>可视化查询管理</div>
                     </button>
@@ -40,7 +42,7 @@ const HomePage = () => {
 
                 {/* 左下：智能化集成管理 */}
                 <div className={`${styles.menuItem} ${styles.bottomLeft}`}>
-                    <button onClick={() => navigateToBasicInfo("warehouse-mng")} className={styles.menuButton}>
+                    <button onClick={() => navigateToValidRoute("/demo/page1")} className={styles.menuButton}>
                         <UngroupOutlined style={{ fontSize: '5rem' }} />
                         <div>智能化集成管理</div>
                     </button>
@@ -48,7 +50,7 @@ const HomePage = () => {
 
                 {/* 右下：预警报警管理 */}
                 <div className={`${styles.menuItem} ${styles.bottomRight}`}>
-                    <button onClick={() => navigateToBasicInfo("warehouse-mng")} className={styles.menuButton}>
+                    <button onClick={() => navigateToValidRoute("/user/list")} className={styles.menuButton}>
                         <BulbOutlined style={{ fontSize: '5rem' }} />
                         <div>预警报警管理</div>
                     </button>
