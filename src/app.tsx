@@ -10,7 +10,7 @@ import { clearSessionToken, getAccessToken, getRefreshToken, getTokenExpireTime 
 // 修改导入语句，移除不存在的setRemoteMenu函数
 import { getRemoteMenu, getRoutersInfo, getUserInfo, patchRouteWithRemoteMenus } from './services/session';
 import { PageEnum } from './enums/pagesEnums';
-// 修改导入路径，使用正确的相对路径
+// 导入正确路径的routes配置
 import routes from '../config/routes';
 
 

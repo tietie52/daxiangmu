@@ -1,247 +1,161 @@
-import React from 'react';
-import { Card, Row, Col, Statistic, Progress, List, Tag } from 'antd';
+import React, { useState } from 'react';
+import { Card, Row, Col, Statistic, Typography, Space, Button } from 'antd';
+import { Link } from '@umijs/max';
 import { 
-  UserOutlined, 
-  DatabaseOutlined, 
-  ServerOutlined, 
-  BarChartOutlined, 
-  AlertOutlined,
-  CheckCircleOutlined,
-  ClockCircleOutlined,
-  LockOutlined
+  MessageOutlined,
+  FileTextOutlined,
+  DollarOutlined,
+  SettingOutlined,
+  UserOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 import styles from './index.less';
 
+const { Title, Text } = Typography;
+
 const SystemOverview: React.FC = () => {
-  // 系统状态数据
-  const systemStats = [
-    {
-      title: '在线用户',
-      value: 128,
-      icon: <UserOutlined />,
-      color: '#1890ff'
-    },
-    {
-      title: '数据总量',
-      value: '28.5',
-      suffix: 'GB',
-      icon: <DatabaseOutlined />,
-      color: '#52c41a'
-    },
-    {
-      title: '服务器负载',
-      value: 28,
-      suffix: '%',
-      icon: <ServerOutlined />,
-      color: '#faad14'
-    },
-    {
-      title: '数据更新率',
-      value: 98.5,
-      suffix: '%',
-      icon: <BarChartOutlined />,
-      color: '#722ed1'
-    }
+  // Core metrics data - 从消息列表和持仓数据中获取实际数据（模拟）
+  const [coreMetrics, setCoreMetrics] = useState({
+    unreadMessages: 23,  // 未读消息数
+    pendingReports: 8,   // 待审核报告数
+    totalAssetValue: 1258000,  // 当前总资产估值
+  });
+
+  // Quick access modules
+  const quickAccessModules = [
+    { name: '消息列表', icon: <MessageOutlined />, path: '/display/message-list', color: '#1890ff' },
+    { name: '持仓数据', icon: <DollarOutlined />, path: '/display/portfolio-data', color: '#faad14' },
+    { name: '建议报告', icon: <FileTextOutlined />, path: '/display/advice-report', color: '#52c41a' },
+    { name: '系统设置', icon: <SettingOutlined />, path: '/settings', color: '#722ed1' },
+    { name: '用户管理', icon: <UserOutlined />, path: '/user/list', color: '#eb2f96' },
+    { name: '数据分析', icon: <BarChartOutlined />, path: '/dashboard', color: '#13c2c2' },
   ];
-
-  // 系统组件状态
-  const componentStatus = [
-    {
-      name: '数据库',
-      status: 'normal',
-      uptime: '45天',
-      version: 'MySQL 8.0.28'
-    },
-    {
-      name: 'API服务',
-      status: 'normal',
-      uptime: '12天',
-      version: 'v2.3.5'
-    },
-    {
-      name: '缓存服务',
-      status: 'warning',
-      uptime: '8天',
-      version: 'Redis 6.2.6'
-    },
-    {
-      name: '认证服务',
-      status: 'normal',
-      uptime: '30天',
-      version: 'OAuth 2.0'
-    }
-  ];
-
-  // 最近系统事件
-  const recentEvents = [
-    {
-      time: '今天 09:30',
-      event: '系统例行数据备份完成',
-      level: 'info'
-    },
-    {
-      time: '今天 08:15',
-      event: '用户张三登录系统',
-      level: 'info'
-    },
-    {
-      time: '昨天 18:45',
-      event: '缓存服务内存使用率超过80%，已自动扩容',
-      level: 'warning'
-    },
-    {
-      time: '昨天 12:30',
-      event: 'API服务版本更新至v2.3.5',
-      level: 'info'
-    },
-    {
-      time: '昨天 10:00',
-      event: '检测到异常登录尝试，已自动阻止',
-      level: 'danger'
-    }
-  ];
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'normal':
-        return <CheckCircleOutlined style={{ color: '#52c41a' }} />;
-      case 'warning':
-        return <AlertOutlined style={{ color: '#faad14' }} />;
-      case 'danger':
-        return <AlertOutlined style={{ color: '#ff4d4f' }} />;
-      default:
-        return <ClockCircleOutlined style={{ color: '#8c8c8c' }} />;
-    }
-  };
-
-  const getLevelColor = (level: string) => {
-    switch (level) {
-      case 'info':
-        return '#1890ff';
-      case 'warning':
-        return '#faad14';
-      case 'danger':
-        return '#ff4d4f';
-      default:
-        return '#8c8c8c';
-    }
-  };
-
-  const getLevelText = (level: string) => {
-    switch (level) {
-      case 'info':
-        return '信息';
-      case 'warning':
-        return '警告';
-      case 'danger':
-        return '危险';
-      default:
-        return '其他';
-    }
-  };
 
   return (
     <div className={styles.container}>
       <h1>系统概览</h1>
       
-      {/* 系统统计卡片 */}
-      <Row gutter={[16, 16]}>
-        {systemStats.map((stat, index) => (
-          <Col span={6} key={index}>
-            <Card>
-              <Statistic
-                title={stat.title}
-                value={stat.value}
-                precision={stat.title.includes('数据更新率') ? 1 : 0}
-                valueStyle={{ color: stat.color }}
-                prefix={stat.icon}
-                suffix={stat.suffix}
-              />
-            </Card>
-          </Col>
-        ))}
-      </Row>
-      
-      {/* 系统组件状态和最近事件 */}
-      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-        <Col span={12}>
-          <Card title="系统组件状态">
-            <div className={styles.componentStatusList}>
-              {componentStatus.map((component, index) => (
-                <div key={index} className={styles.componentItem}>
-                  <div className={styles.componentHeader}>
-                    <span>{component.name}</span>
-                    <span style={{ display: 'flex', alignItems: 'center' }}>
-                      {getStatusIcon(component.status)}
-                      <span style={{ marginLeft: 4 }}>
-                        {component.status === 'normal' ? '正常' : 
-                         component.status === 'warning' ? '警告' : '异常'}
-                      </span>
-                    </span>
-                  </div>
-                  <div className={styles.componentInfo}>
-                    <span>运行时间：{component.uptime}</span>
-                    <span>版本：{component.version}</span>
-                  </div>
-                  <Progress 
-                    percent={component.status === 'normal' ? 100 : 
-                            component.status === 'warning' ? 70 : 30}
-                    strokeColor={component.status === 'normal' ? '#52c41a' : 
-                              component.status === 'warning' ? '#faad14' : '#ff4d4f'}
-                    size="small"
-                  />
-                </div>
-              ))}
-            </div>
-          </Card>
-        </Col>
-        
-        <Col span={12}>
-          <Card title="最近系统事件">
-            <List
-              dataSource={recentEvents}
-              renderItem={item => (
-                <List.Item>
-                  <List.Item.Meta
-                    description={
-                      <div className={styles.eventItem}>
-                        <span className={styles.eventTime}>{item.time}</span>
-                        <span className={styles.eventText}>{item.event}</span>
-                        <Tag color={getLevelColor(item.level)}>
-                          {getLevelText(item.level)}
-                        </Tag>
-                      </div>
-                    }
-                  />
-                </List.Item>
-              )}
+      {/* Core Metrics Section */}
+      <Row gutter={[16, 16]} style={{ marginBottom: '32px' }}>
+        <Col span={8}>
+          <Card hoverable bordered={false}>
+            <Statistic
+              title="未读消息数"
+              value={coreMetrics.unreadMessages}
+              prefix={<MessageOutlined />}
+              valueStyle={{ color: '#ff4d4f' }}
+              extra={<Text type="secondary">点击查看详情</Text>}
             />
+            <div style={{ marginTop: '16px', textAlign: 'center' }}>
+              <Link to="/display/message-list">
+                <Button type="primary" size="small">
+                  查看消息
+                </Button>
+              </Link>
+            </div>
+          </Card>
+        </Col>
+        <Col span={8}>
+          <Card hoverable bordered={false}>
+            <Statistic
+              title="待审核报告数"
+              value={coreMetrics.pendingReports}
+              prefix={<FileTextOutlined />}
+              valueStyle={{ color: '#faad14' }}
+              extra={<Text type="secondary">点击处理</Text>}
+            />
+            <div style={{ marginTop: '16px', textAlign: 'center' }}>
+              <Link to="/display/advice-report">
+                <Button type="primary" size="small">
+                  审核报告
+                </Button>
+              </Link>
+            </div>
+          </Card>
+        </Col>
+        <Col span={8}>
+          <Card hoverable bordered={false}>
+            <Statistic
+              title="当前总资产估值"
+              value={coreMetrics.totalAssetValue}
+              prefix={<DollarOutlined />}
+              valueStyle={{ color: '#52c41a' }}
+              formatter={value => `¥ ${value.toLocaleString()}`}
+              extra={<Text type="secondary">实时更新</Text>}
+            />
+            <div style={{ marginTop: '16px', textAlign: 'center' }}>
+              <Link to="/display/portfolio-data">
+                <Button type="primary" size="small">
+                  查看详情
+                </Button>
+              </Link>
+            </div>
           </Card>
         </Col>
       </Row>
-      
-      {/* 安全信息 */}
-      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-        <Col span={24}>
-          <Card title="安全信息">
-            <div className={styles.securityInfo}>
-              <div className={styles.securityItem}>
-                <LockOutlined />
-                <span>上次安全审计时间：2024-01-10</span>
+
+      {/* Quick Access Modules */}
+      <Card title="功能模块快速入口" bordered={false} style={{ marginBottom: '32px' }}>
+        <Row gutter={[16, 16]}>
+          {quickAccessModules.map((module, index) => (
+            <Col key={index} span={8}>
+              <Link to={module.path} style={{ textDecoration: 'none' }}>
+                <Card hoverable bordered={false} style={{ textAlign: 'center', cursor: 'pointer' }}>
+                  <div style={{ fontSize: '32px', color: module.color, marginBottom: '12px' }}>
+                    {module.icon}
+                  </div>
+                  <Text strong style={{ fontSize: '16px' }}>{module.name}</Text>
+                </Card>
+              </Link>
+            </Col>
+          ))}
+        </Row>
+      </Card>
+
+      {/* System Status Summary */}
+      <Row gutter={[16, 16]}>
+        <Col span={12}>
+          <Card title="系统运行状态" bordered={false}>
+            <Space direction="vertical" size="large" style={{ width: '100%' }}>
+              <div>
+                <Text strong style={{ marginRight: '8px' }}>系统状态：</Text>
+                <Text type="success">正常运行</Text>
               </div>
-              <div className={styles.securityItem}>
-                <CheckCircleOutlined />
-                <span>SSL证书有效期：2024-12-31</span>
+              <div>
+                <Text strong style={{ marginRight: '8px' }}>系统版本：</Text>
+                <Text>v2.1.0</Text>
               </div>
-              <div className={styles.securityItem}>
-                <AlertOutlined />
-                <span>高危漏洞数量：0</span>
+              <div>
+                <Text strong style={{ marginRight: '8px' }}>最后更新：</Text>
+                <Text>2023-06-15 14:30:25</Text>
               </div>
-              <div className={styles.securityItem}>
-                <CheckCircleOutlined />
-                <span>安全策略状态：正常</span>
+              <div>
+                <Text strong style={{ marginRight: '8px' }}>数据更新频率：</Text>
+                <Text>每5分钟</Text>
               </div>
-            </div>
+            </Space>
+          </Card>
+        </Col>
+        <Col span={12}>
+          <Card title="今日数据概览" bordered={false}>
+            <Space direction="vertical" size="large" style={{ width: '100%' }}>
+              <div>
+                <Text strong style={{ marginRight: '8px' }}>新增消息：</Text>
+                <Text>45条</Text>
+              </div>
+              <div>
+                <Text strong style={{ marginRight: '8px' }}>生成报告：</Text>
+                <Text>12份</Text>
+              </div>
+              <div>
+                <Text strong style={{ marginRight: '8px' }}>资产变动：</Text>
+                <Text type="success">+2.3%</Text>
+              </div>
+              <div>
+                <Text strong style={{ marginRight: '8px' }}>活跃用户：</Text>
+                <Text>15人</Text>
+              </div>
+            </Space>
           </Card>
         </Col>
       </Row>

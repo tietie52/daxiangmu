@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Card, Table, Tag, Select, DatePicker, Row, Col, Statistic } from 'antd';
-import { AreaChartOutlined, RiseOutlined, FallOutlined } from '@ant-design/icons';
+import { Card, Table, Tag, Select, DatePicker, Row, Col, Statistic, Button } from 'antd';
+import { AreaChartOutlined, RiseOutlined, FallOutlined, DownloadOutlined } from '@ant-design/icons';
+import { Pie, Line } from '@ant-design/plots';
 import styles from './index.less';
 
 const { Option } = Select;
@@ -23,68 +24,131 @@ const PortfolioData: React.FC = () => {
   const [timeRange, setTimeRange] = useState<string>('all');
   const [dateRange, setDateRange] = useState<any[]>([]);
 
+  // 持仓数据
   const portfolioData: PortfolioItem[] = [
     {
       key: '1',
-      code: '000001',
-      name: '平安银行',
-      quantity: 1000,
-      buyPrice: 12.50,
-      currentPrice: 13.80,
-      profit: 1300,
-      profitRate: 10.4,
-      marketValue: 13800,
+      code: 'BTC',
+      name: '比特币',
+      quantity: 0.5,
+      buyPrice: 40000,
+      currentPrice: 45000,
+      profit: 2500,
+      profitRate: 12.5,
+      marketValue: 22500,
       holdingDays: 45,
     },
     {
       key: '2',
-      code: '600036',
-      name: '招商银行',
-      quantity: 500,
-      buyPrice: 35.20,
-      currentPrice: 33.80,
-      profit: -700,
-      profitRate: -4.0,
-      marketValue: 16900,
+      code: 'ETH',
+      name: '以太坊',
+      quantity: 5,
+      buyPrice: 2800,
+      currentPrice: 3200,
+      profit: 2000,
+      profitRate: 14.3,
+      marketValue: 16000,
       holdingDays: 60,
     },
     {
       key: '3',
-      code: '002415',
-      name: '海康威视',
-      quantity: 300,
-      buyPrice: 48.50,
-      currentPrice: 52.30,
-      profit: 1140,
-      profitRate: 7.8,
-      marketValue: 15690,
+      code: 'SOL',
+      name: 'Solana',
+      quantity: 100,
+      buyPrice: 90,
+      currentPrice: 110,
+      profit: 2000,
+      profitRate: 22.2,
+      marketValue: 11000,
       holdingDays: 30,
     },
     {
       key: '4',
-      code: '000858',
-      name: '五粮液',
-      quantity: 100,
-      buyPrice: 168.00,
-      currentPrice: 182.50,
-      profit: 1450,
-      profitRate: 8.6,
-      marketValue: 18250,
+      code: 'USDT',
+      name: '泰达币',
+      quantity: 10000,
+      buyPrice: 1,
+      currentPrice: 1,
+      profit: 0,
+      profitRate: 0,
+      marketValue: 10000,
       holdingDays: 90,
     },
     {
       key: '5',
-      code: '000333',
-      name: '美的集团',
-      quantity: 200,
-      buyPrice: 55.60,
-      currentPrice: 53.20,
-      profit: -480,
-      profitRate: -4.3,
-      marketValue: 10640,
+      code: 'DOT',
+      name: '波卡',
+      quantity: 500,
+      buyPrice: 5,
+      currentPrice: 6,
+      profit: 500,
+      profitRate: 20,
+      marketValue: 3000,
       holdingDays: 20,
     },
   ];
+
+  // 图表配置 - 资产占比饼图
+  const pieConfig = {
+    data: portfolioData.map(item => ({
+      type: item.code,
+      value: item.marketValue
+    })),
+    angleField: 'value',
+    colorField: 'type',
+    radius: 0.8,
+    label: {
+      type: 'inner',
+      offset: '-30%',
+      content: ({ percent }) => `${(percent * 100).toFixed(0)}%`,
+      style: {
+        fontSize: 14,
+        textAlign: 'center',
+      },
+    },
+    interactions: [
+      { type: 'element-active' },
+    ],
+  };
+
+  // 图表配置 - 近7日持仓变化折线图
+  const lineConfig = {
+    data: [
+      { date: '6-10', value: 48500 },
+      { date: '6-11', value: 50200 },
+      { date: '6-12', value: 49800 },
+      { date: '6-13', value: 51500 },
+      { date: '6-14', value: 52800 },
+      { date: '6-15', value: 54500 },
+      { date: '6-16', value: 55000 },
+    ],
+    xField: 'date',
+    yField: 'value',
+    smooth: true,
+    point: {
+      size: 5,
+      shape: 'diamond',
+    },
+    tooltip: {
+      showMarkers: false,
+    },
+    state: {
+      active: {
+        style: {
+          shadowBlur: 4,
+          stroke: '#000',
+          fill: 'red',
+        },
+      },
+    },
+  };
+
+  // 导出Excel函数
+  const handleExport = () => {
+    // 简单模拟导出功能
+    alert('Excel导出功能已触发');
+    // 实际项目中可以使用xlsx库实现真正的导出功能
+  };
 
   // 计算总市值和总盈亏
   const totalMarketValue = portfolioData.reduce((sum, item) => sum + item.marketValue, 0);
@@ -173,6 +237,14 @@ const PortfolioData: React.FC = () => {
             <Option value="quarter">本季度</Option>
           </Select>
           <RangePicker style={{ marginLeft: 16 }} onChange={setDateRange} />
+          <Button 
+            type="primary" 
+            icon={<DownloadOutlined />} 
+            style={{ marginLeft: 'auto' }} 
+            onClick={handleExport}
+          >
+            导出Excel
+          </Button>
         </div>
         
         <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
@@ -212,23 +284,49 @@ const PortfolioData: React.FC = () => {
           <Col span={6}>
             <Card>
               <Statistic
-                title="持有股票数"
+                title="持有资产数"
                 value={portfolioData.length}
                 precision={0}
                 valueStyle={{ color: '#1890ff' }}
-                prefix={AreaChartOutlined}
+                prefix={<AreaChartOutlined />}
               />
             </Card>
           </Col>
         </Row>
         
-        <Table
-          columns={columns}
-          dataSource={portfolioData}
-          rowKey="key"
-          pagination={{ pageSize: 10 }}
-          style={{ marginTop: 24 }}
-        />
+
+        
+        {/* 图表展示区域 */}
+        <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
+          {/* 资产占比饼图 */}
+          <Col span={12}>
+            <Card title="资产占比">
+              <Pie
+                {...pieConfig}
+                style={{ height: 300 }}
+              />
+            </Card>
+          </Col>
+          {/* 近7日持仓变化折线图 */}
+          <Col span={12}>
+            <Card title="近7日持仓变化">
+              <Line
+                {...lineConfig}
+                style={{ height: 300 }}
+              />
+            </Card>
+          </Col>
+        </Row>
+        
+        {/* 持仓列表 */}
+        <Card title="持仓详情" style={{ marginTop: 24 }}>
+          <Table
+            columns={columns}
+            dataSource={portfolioData}
+            rowKey="key"
+            pagination={{ pageSize: 10 }}
+          />
+        </Card>
       </Card>
     </div>
   );
