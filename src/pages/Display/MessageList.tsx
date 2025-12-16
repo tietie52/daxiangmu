@@ -82,6 +82,9 @@ const mockMessages: Message[] = [
 ];
 
 const MessageList: React.FC = () => {
+  // 用户角色类型定义
+  type UserRole = 'viewer' | 'admin';
+
   // 状态管理
   const [messages, setMessages] = useState<Message[]>([]);
   const [filteredMessages, setFilteredMessages] = useState<Message[]>([]);
@@ -94,6 +97,7 @@ const MessageList: React.FC = () => {
   const [editModalVisible, setEditModalVisible] = useState<boolean>(false);
   const [form] = Form.useForm();
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [userRole, setUserRole] = useState<UserRole>('admin'); // 默认角色为管理员
 
   // 初始化数据
   useEffect(() => {
@@ -180,8 +184,7 @@ const MessageList: React.FC = () => {
       key: 'source',
       width: 120
     },
-    {
-      title: '操作',
+    {title: '操作',
       key: 'action',
       width: 150,
       render: (_, record: Message) => (
@@ -194,21 +197,25 @@ const MessageList: React.FC = () => {
           >
             查看
           </Button>
-          <Button 
-            icon={<EditOutlined />} 
-            size="small"
-            onClick={() => handleEditModalOpen(record)}
-          >
-            编辑
-          </Button>
-          <Button 
-            danger 
-            icon={<DeleteOutlined />} 
-            size="small"
-            onClick={() => handleDeleteMessage(record.id)}
-          >
-            删除
-          </Button>
+          {userRole === 'admin' && (
+            <>
+              <Button 
+                icon={<EditOutlined />} 
+                size="small"
+                onClick={() => handleEditModalOpen(record)}
+              >
+                编辑
+              </Button>
+              <Button 
+                danger 
+                icon={<DeleteOutlined />} 
+                size="small"
+                onClick={() => handleDeleteMessage(record.id)}
+              >
+                删除
+              </Button>
+            </>
+          )}
         </Space>
       )
     }
@@ -331,13 +338,15 @@ const MessageList: React.FC = () => {
         title="消息列表" 
         className={styles.messageCard}
         extra={
-          <Button 
-            type="primary" 
-            icon={<PlusOutlined />} 
-            onClick={() => setAddModalVisible(true)}
-          >
-            添加消息
-          </Button>
+          userRole === 'admin' && (
+            <Button 
+              type="primary" 
+              icon={<PlusOutlined />} 
+              onClick={() => setAddModalVisible(true)}
+            >
+              添加消息
+            </Button>
+          )
         }
       >
         {/* 筛选栏 */}
@@ -378,6 +387,16 @@ const MessageList: React.FC = () => {
             </Select>
             
             <Button onClick={handleResetFilters}>重置筛选</Button>
+            
+            <Select
+              placeholder="切换角色"
+              style={{ width: 120 }}
+              value={userRole}
+              onChange={(value) => setUserRole(value as UserRole)}
+            >
+              <Option value="viewer">普通查看员</Option>
+              <Option value="admin">管理员</Option>
+            </Select>
           </Space>
         </div>
 
