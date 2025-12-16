@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import moment from 'moment';
 import { 
-  Card, Table, Tag, Button, Input, Select, Modal, Space, DatePicker 
+  Card, Table, Tag, Button, Input, Select, Modal, Space, DatePicker, Form, message 
 } from 'antd';
 import { 
-  SearchOutlined, EyeOutlined 
+  SearchOutlined, EyeOutlined, PlusOutlined, EditOutlined, DeleteOutlined 
 } from '@ant-design/icons';
 import styles from './index.less';
 
@@ -89,6 +90,10 @@ const MessageList: React.FC = () => {
   const [searchText, setSearchText] = useState<string>('');
   const [detailModalVisible, setDetailModalVisible] = useState<boolean>(false);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [addModalVisible, setAddModalVisible] = useState<boolean>(false);
+  const [editModalVisible, setEditModalVisible] = useState<boolean>(false);
+  const [form] = Form.useForm();
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
 
   // 初始化数据
   useEffect(() => {
@@ -178,7 +183,7 @@ const MessageList: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 150,
       render: (_, record: Message) => (
         <Space size="middle">
           <Button 
@@ -188,6 +193,21 @@ const MessageList: React.FC = () => {
             onClick={() => handleViewDetail(record)}
           >
             查看
+          </Button>
+          <Button 
+            icon={<EditOutlined />} 
+            size="small"
+            onClick={() => handleEditModalOpen(record)}
+          >
+            编辑
+          </Button>
+          <Button 
+            danger 
+            icon={<DeleteOutlined />} 
+            size="small"
+            onClick={() => handleDeleteMessage(record.id)}
+          >
+            删除
           </Button>
         </Space>
       )
@@ -228,9 +248,98 @@ const MessageList: React.FC = () => {
     setSearchText('');
   };
 
+  // 打开添加模态框
+  const handleAddModalOpen = () => {
+    form.resetFields();
+    setEditingMessage(null);
+    setAddModalVisible(true);
+  };
+
+  // 关闭添加/编辑模态框
+  const handleAddModalClose = () => {
+    setAddModalVisible(false);
+    setEditModalVisible(false);
+    form.resetFields();
+    setEditingMessage(null);
+  };
+
+  // 打开编辑模态框
+  const handleEditModalOpen = (record: Message) => {
+    setEditingMessage(record);
+    form.setFieldsValue({
+      title: record.title,
+      content: record.content,
+      cryptoType: record.cryptoType,
+      sentiment: record.sentiment,
+      date: moment(record.date, 'YYYY-MM-DD HH:mm:ss'),
+      source: record.source
+    });
+    setEditModalVisible(true);
+  };
+
+  // 删除消息
+  const handleDeleteMessage = (id: string) => {
+    Modal.confirm({
+      title: '确认删除',
+      content: '确定要删除这条消息吗？',
+      onOk: () => {
+        const updatedMessages = messages.filter(message => message.id !== id);
+        setMessages(updatedMessages);
+        message.success('删除成功');
+      }
+    });
+  };
+
+  // 表单提交处理
+  const handleFormSubmit = () => {
+    form.validateFields().then(values => {
+      let newMessage: Message;
+      
+      if (editingMessage) {
+        // 编辑现有消息
+        newMessage = {
+          ...editingMessage,
+          ...values,
+          date: values.date.format('YYYY-MM-DD HH:mm:ss')
+        };
+        const updatedMessages = messages.map(message => 
+          message.id === editingMessage.id ? newMessage : message
+        );
+        setMessages(updatedMessages);
+        message.success('编辑成功');
+      } else {
+        // 添加新消息
+        newMessage = {
+          ...values,
+          id: Date.now().toString(),
+          date: values.date.format('YYYY-MM-DD HH:mm:ss')
+        };
+        const updatedMessages = [newMessage, ...messages];
+        setMessages(updatedMessages);
+        message.success('添加成功');
+      }
+      
+      handleAddModalClose();
+    }).catch(errorInfo => {
+      console.log('表单验证失败:', errorInfo);
+    });
+  };
+
   return (
     <div className={styles.container}>
-      <Card title="消息列表" className={styles.messageCard}>
+      <Card 
+        title="消息列表" 
+        className={styles.messageCard}
+        extra={
+          <Button 
+            type="primary" 
+            icon={<PlusOutlined />} 
+            onClick={() => setAddModalVisible(true)}
+          >
+            添加消息
+          </Button>
+        }
+      >
         {/* 筛选栏 */}
         <div className={styles.filterBar}>
           <Space wrap size="middle">
@@ -315,6 +424,86 @@ const MessageList: React.FC = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* 添加/编辑消息弹窗 */}
+      <Modal
+        title={editingMessage ? "编辑消息" : "添加消息"}
+        open={addModalVisible || editModalVisible}
+        onCancel={handleAddModalClose}
+        onOk={handleFormSubmit}
+        width={600}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={{
+            date: moment()
+          }}
+        >
+          <Form.Item
+            name="title"
+            label="标题"
+            rules={[{ required: true, message: '请输入标题' }]}
+          >
+            <Input placeholder="请输入消息标题" />
+          </Form.Item>
+
+          <Form.Item
+            name="content"
+            label="内容"
+            rules={[{ required: true, message: '请输入内容' }]}
+          >
+            <Input.TextArea rows={4} placeholder="请输入消息内容" />
+          </Form.Item>
+
+          <Form.Item
+            name="cryptoType"
+            label="数字货币类型"
+            rules={[{ required: true, message: '请选择数字货币类型' }]}
+          >
+            <Select placeholder="请选择数字货币类型">
+              <Option value="ALL">全部</Option>
+              <Option value="BTC">比特币(BTC)</Option>
+              <Option value="ETH">以太坊(ETH)</Option>
+              <Option value="DOGE">狗狗币(DOGE)</Option>
+              <Option value="SOL">Solana(SOL)</Option>
+              <Option value="ADA">Cardano(ADA)</Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="sentiment"
+            label="情绪"
+            rules={[{ required: true, message: '请选择情绪' }]}
+          >
+            <Select placeholder="请选择情绪">
+              <Option value="positive">利好</Option>
+              <Option value="negative">利空</Option>
+              <Option value="neutral">中性</Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="date"
+            label="发布时间"
+            rules={[{ required: true, message: '请选择发布时间' }]}
+          >
+            <DatePicker 
+              showTime 
+              format="YYYY-MM-DD HH:mm:ss" 
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="source"
+            label="来源"
+            rules={[{ required: true, message: '请输入来源' }]}
+          >
+            <Input placeholder="请输入消息来源" />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );
