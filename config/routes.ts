@@ -38,15 +38,6 @@ export default [
     path: '/form',
     name: '表单页面',
     routes: [
-      {
-        path: '/form',
-        redirect: '/form/basic',
-      },
-      {
-        path: '/form/basic',
-        name: '基础表单',
-        component: './Form/BasicForm',
-      },
       // 暂时移除不存在的组件引用
     ],
   },
