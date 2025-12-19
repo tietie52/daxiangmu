@@ -1,85 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import moment from 'moment';
-import { 
-  Card, Table, Tag, Button, Input, Select, Modal, Space, DatePicker, Form, message 
+import { request } from '@umijs/max';
+import { getAccessToken } from '@/access';
+// 移除未使用的 API 类型导入，避免“找不到模块”报错
+import {
+  Card, Table, Tag, Button, Input, Select, Modal, Space, DatePicker, Form, message, ConfigProvider,
+  TableColumnType, TableColumnGroupType
 } from 'antd';
-import { 
-  SearchOutlined, EyeOutlined, PlusOutlined, EditOutlined, DeleteOutlined 
+import {
+  SearchOutlined, EyeOutlined, PlusOutlined, EditOutlined, DeleteOutlined
 } from '@ant-design/icons';
 import styles from './index.less';
+
+// 核心修改：适配后端的/crypto-news接口路径
+const BASE_API = '/api';
+const NEWS_API = `${BASE_API}/crypto-news`; // 后端接口根路径
+
+// 使用项目提供的request工具，自动继承全局拦截器配置
+const api = {
+  get: (url: string, options?: any) => request(url, { method: 'GET', ...options }),
+  post: (url: string, data?: any, options?: any) => request(url, { method: 'POST', data, ...options }),
+  put: (url: string, data?: any, options?: any) => request(url, { method: 'PUT', data, ...options }),
+  delete: (url: string, options?: any) => request(url, { method: 'DELETE', ...options }),
+};
 
 // 解构必须在所有导入语句之后
 const { Option } = Select;
 const { RangePicker } = DatePicker;
 
-// 定义消息接口
+// 定义消息接口（适配后端字段：emotion/publishTime → 前端sentiment/date）
 interface Message {
   id: string;
   title: string;
   content: string;
   cryptoType: string;
-  sentiment: 'positive' | 'negative' | 'neutral';
-  date: string;
+  emotion: string; // 后端字段
+  sentiment: 'positive' | 'negative' | 'neutral'; // 前端展示字段
+  publishTime: string; // 后端字段
+  date: string; // 前端展示字段
   source: string;
 }
-
-// 模拟消息数据
-const mockMessages: Message[] = [
-  {
-    id: '1',
-    title: '比特币突破70000美元整数关口',
-    content: '比特币价格今日突破70000美元整数关口，创历史新高。分析师认为，机构投资者的持续入场是推动价格上涨的主要原因。',
-    cryptoType: 'BTC',
-    sentiment: 'positive',
-    date: '2024-06-20 14:30:00',
-    source: 'CoinDesk'
-  },
-  {
-    id: '2',
-    title: '以太坊伦敦硬分叉成功部署',
-    content: '以太坊网络已成功部署伦敦硬分叉，EIP-1559提案正式生效，这将改变以太坊的交易费机制。',
-    cryptoType: 'ETH',
-    sentiment: 'neutral',
-    date: '2024-06-19 10:15:00',
-    source: 'Ethereum Foundation'
-  },
-  {
-    id: '3',
-    title: '监管机构加强对加密货币交易所的审查',
-    content: '多个国家的监管机构宣布将加强对加密货币交易所的审查力度，以防止洗钱和其他非法活动。',
-    cryptoType: 'ALL',
-    sentiment: 'negative',
-    date: '2024-06-18 16:45:00',
-    source: 'Financial Times'
-  },
-  {
-    id: '4',
-    title: '狗狗币社区推出重大技术升级计划',
-    content: '狗狗币社区宣布将推出重大技术升级计划，包括提高交易速度和降低手续费。',
-    cryptoType: 'DOGE',
-    sentiment: 'positive',
-    date: '2024-06-17 09:30:00',
-    source: 'Dogecoin Foundation'
-  },
-  {
-    id: '5',
-    title: 'Solana网络遭遇短暂中断',
-    content: 'Solana网络今日遭遇短暂中断，持续约30分钟后恢复正常。团队正在调查中断原因。',
-    cryptoType: 'SOL',
-    sentiment: 'negative',
-    date: '2024-06-16 13:20:00',
-    source: 'Solana Status'
-  },
-  {
-    id: '6',
-    title: 'Cardano智能合约平台正式上线',
-    content: 'Cardano智能合约平台正式上线，标志着Cardano从单纯的加密货币向完整的区块链平台转型。',
-    cryptoType: 'ADA',
-    sentiment: 'positive',
-    date: '2024-06-15 11:00:00',
-    source: 'Cardano Foundation'
-  }
-];
 
 const MessageList: React.FC = () => {
   // 用户角色类型定义
@@ -97,39 +57,113 @@ const MessageList: React.FC = () => {
   const [editModalVisible, setEditModalVisible] = useState<boolean>(false);
   const [form] = Form.useForm();
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
-  const [userRole, setUserRole] = useState<UserRole>('admin'); // 默认角色为管理员
+  // 使用AntD v5推荐的useMessage hook替代静态message方法
+  const [messageApi, contextHolder] = message.useMessage();
+  const [userRole, setUserRole] = useState<UserRole>('admin'); 
+  const [loading, setLoading] = useState<boolean>(false); // 加载状态
 
-  // 初始化数据
+  // 时间格式化工具函数（适配后端LocalDateTime）
+  const formatDateTime = (dateStr: string) => {
+    if (!dateStr) return '';
+    // 兼容LocalDateTime格式（2025-12-19T10:00:00）和普通格式
+    return moment(dateStr).format('YYYY-MM-DD HH:mm:ss');
+  };
+
+  // 从后端获取消息列表（适配若依分页接口）
+  const fetchMessageList = async () => {
+    try {
+      setLoading(true);
+      // 调用后端分页查询接口：GET /crypto-news/list
+      // 传递分页参数（默认第1页，每页10条）
+      const pageQuery = {
+        pageNum: 1,
+        pageSize: 10
+      };
+      const response = await api.get(`${NEWS_API}/list`, {
+        params: pageQuery
+      });
+      
+      // 关键调试信息：打印完整的后端返回数据
+      console.log('后端返回的完整响应:', response);
+      
+      // 核心修复：正确解析后端返回的数据结构
+      // 后端返回格式：{total: 3, rows: [...], code: 200, msg: "查询成功"}
+      // 数据直接在response对象中，而不是在response.data中
+      const messageList = response?.rows || [];
+      
+      console.log('解析到的原始rows数据:', messageList);
+      console.log('最终的消息列表:', messageList);
+      
+      // 字段映射：后端 → 前端
+      const formattedList = messageList.map((item: any) => ({
+        id: item.id?.toString() || '', // 后端Long转前端string
+        title: item.title || '',
+        content: item.content || '',
+        cryptoType: item.cryptoType || '',
+        emotion: item.emotion || '', // 后端原始字段
+        // 映射情绪字段：后端"正面/负面/中性" → 前端"positive/negative/neutral"
+        sentiment: item.emotion === '正面' ? 'positive' : 
+                   item.emotion === '负面' ? 'negative' : 'neutral',
+        publishTime: item.publishTime || '', // 后端原始字段
+        date: formatDateTime(item.publishTime), // 前端展示格式
+        source: item.source || ''
+      }));
+
+      // 按时间倒序排序
+      const sortedMessages = [...formattedList].sort((a: Message, b: Message) => {
+        return new Date(b.publishTime).getTime() - new Date(a.publishTime).getTime();
+      });
+      
+      setMessages(sortedMessages);
+      setFilteredMessages(sortedMessages);
+      
+      // 无数据时提示
+      if (sortedMessages.length === 0) {
+        messageApi.info('暂无消息数据');
+      }
+    } catch (error) {
+      console.error('获取消息列表失败:', error);
+      // 失败时回退到空数组，避免页面报错
+      setMessages([]);
+      setFilteredMessages([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 初始化数据：从后端加载
   useEffect(() => {
-    // 按时间倒序排序
-    const sortedMessages = [...mockMessages].sort((a, b) => {
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
-    });
-    setMessages(sortedMessages);
-    setFilteredMessages(sortedMessages);
+    fetchMessageList();
   }, []);
 
   // 筛选功能
   useEffect(() => {
+    console.log('筛选前的完整messages:', messages);
     let result = [...messages];
 
     // 按数字货币类型筛选
     if (selectedCrypto) {
+      console.log('按数字货币类型筛选:', selectedCrypto);
       result = result.filter(msg => msg.cryptoType === selectedCrypto || msg.cryptoType === 'ALL');
     }
 
     // 按利好/利空筛选
     if (selectedSentiment) {
+      console.log('按情绪筛选:', selectedSentiment);
       result = result.filter(msg => msg.sentiment === selectedSentiment);
     }
 
-    // 按搜索文本筛选
+    // 按搜索文本筛选（忽略大小写）
     if (searchText) {
+      console.log('按搜索文本筛选:', searchText);
+      const lowerText = searchText.toLowerCase();
       result = result.filter(msg => 
-        msg.title.includes(searchText) || msg.content.includes(searchText)
+        msg.title.toLowerCase().includes(lowerText) || 
+        msg.content.toLowerCase().includes(lowerText)
       );
     }
 
+    console.log('筛选后的filteredMessages:', result);
     setFilteredMessages(result);
   }, [selectedCrypto, selectedSentiment, searchText, messages]);
 
@@ -140,8 +174,8 @@ const MessageList: React.FC = () => {
       dataIndex: 'title',
       key: 'title',
       width: 300,
-      render: (text: string, record: Message) => (
-        <span className={styles.messageTitle}>{text}</span>
+      render: (text: string) => (
+        <span className={styles.messageTitle}>{text || '-'}</span>
       )
     },
     {
@@ -150,7 +184,7 @@ const MessageList: React.FC = () => {
       key: 'cryptoType',
       width: 120,
       render: (text: string) => (
-        <Tag color={text === 'ALL' ? 'default' : 'blue'}>{text}</Tag>
+        <Tag color={text === 'ALL' ? 'default' : 'blue'}>{text || '-'}</Tag>
       )
     },
     {
@@ -160,12 +194,17 @@ const MessageList: React.FC = () => {
       width: 100,
       render: (text: string) => {
         let color = 'default';
-        let textMap = { positive: '利好', negative: '利空', neutral: '中性' };
+        const textMap: Record<string, string> = { 
+          positive: '利好', 
+          negative: '利空', 
+          neutral: '中性' 
+        };
+        const showText = textMap[text] || '未知';
         
         if (text === 'positive') color = 'green';
         if (text === 'negative') color = 'red';
         
-        return <Tag color={color}>{textMap[text as keyof typeof textMap]}</Tag>;
+        return <Tag color={color}>{showText}</Tag>;
       }
     },
     {
@@ -174,20 +213,23 @@ const MessageList: React.FC = () => {
       key: 'date',
       width: 180,
       sorter: (a: Message, b: Message) => {
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
+        return new Date(b.publishTime).getTime() - new Date(a.publishTime).getTime();
       },
-      sortOrder: 'descend'
+      sortOrder: 'descend',
+      render: (text: string) => text || '-'
     },
     {
       title: '来源',
       dataIndex: 'source',
       key: 'source',
-      width: 120
+      width: 120,
+      render: (text: string) => text || '-'
     },
-    {title: '操作',
+    {
+      title: '操作',
       key: 'action',
       width: 150,
-      render: (_, record: Message) => (
+      render: (_: any, record: Message) => (
         <Space size="middle">
           <Button 
             type="primary" 
@@ -253,11 +295,15 @@ const MessageList: React.FC = () => {
     setSelectedCrypto('');
     setSelectedSentiment('');
     setSearchText('');
+    // 重置输入框
+    const input = document.querySelector('input[placeholder="搜索标题或内容"]') as HTMLInputElement;
+    if (input) {
+      input.value = '';
+    }
   };
 
   // 打开添加模态框
   const handleAddModalOpen = () => {
-    form.resetFields();
     setEditingMessage(null);
     setAddModalVisible(true);
   };
@@ -266,266 +312,336 @@ const MessageList: React.FC = () => {
   const handleAddModalClose = () => {
     setAddModalVisible(false);
     setEditModalVisible(false);
-    form.resetFields();
     setEditingMessage(null);
   };
+
+  // 监听添加/编辑模态框关闭状态，当关闭时重置表单
+  useEffect(() => {
+    if (!addModalVisible && !editModalVisible) {
+      form.resetFields();
+    }
+  }, [addModalVisible, editModalVisible, form]);
 
   // 打开编辑模态框
   const handleEditModalOpen = (record: Message) => {
     setEditingMessage(record);
-    form.setFieldsValue({
-      title: record.title,
-      content: record.content,
-      cryptoType: record.cryptoType,
-      sentiment: record.sentiment,
-      date: moment(record.date, 'YYYY-MM-DD HH:mm:ss'),
-      source: record.source
-    });
     setEditModalVisible(true);
   };
 
-  // 删除消息
+  // 监听编辑模态框显示状态，当显示时设置表单初始值
+  useEffect(() => {
+    if (editModalVisible && editingMessage) {
+      // 兼容时间格式，避免赋值失败（使用后端的publishTime字段）
+      const formatDate = editingMessage.publishTime ? moment(editingMessage.publishTime) : moment();
+      form.setFieldsValue({
+        title: editingMessage.title,
+        content: editingMessage.content,
+        cryptoType: editingMessage.cryptoType,
+        sentiment: editingMessage.sentiment,
+        date: formatDate,
+        source: editingMessage.source
+      });
+    }
+  }, [editModalVisible, editingMessage, form]);
+
+  // 删除消息（适配后端批量删除接口：/crypto-news/{ids}）
   const handleDeleteMessage = (id: string) => {
+    if (!id) {
+      messageApi.warning('消息ID为空，无法删除');
+      return;
+    }
     Modal.confirm({
       title: '确认删除',
-      content: '确定要删除这条消息吗？',
-      onOk: () => {
-        const updatedMessages = messages.filter(message => message.id !== id);
-        setMessages(updatedMessages);
-        message.success('删除成功');
+      content: '确定要删除这条消息吗？删除后无法恢复',
+      okText: '确认',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          setLoading(true);
+          // 调用后端删除接口：DELETE /crypto-news/{ids}（支持单个ID）
+          await api.delete(`${NEWS_API}/${id}`);
+          messageApi.success('删除成功');
+          // 重新获取列表，更新前端数据
+          fetchMessageList();
+        } catch (error) {
+          console.error('删除消息失败:', error);
+        } finally {
+          setLoading(false);
+        }
       }
     });
   };
 
-  // 表单提交处理
-  const handleFormSubmit = () => {
-    form.validateFields().then(values => {
-      let newMessage: Message;
+  // 表单提交处理（新增/编辑，适配后端字段）
+  const handleFormSubmit = async () => {
+    try {
+      setLoading(true);
+      const values = await form.validateFields();
       
+      // 格式化提交数据（映射前端字段→后端字段）
+      const submitData = {
+        title: values.title,
+        content: values.content,
+        cryptoType: values.cryptoType,
+        // 前端sentiment → 后端emotion
+        emotion: values.sentiment === 'positive' ? '正面' : 
+                 values.sentiment === 'negative' ? '负面' : '中性',
+        // 前端date → 后端publishTime
+        publishTime: values.date.format('YYYY-MM-DD HH:mm:ss'),
+        source: values.source
+      };
+
       if (editingMessage) {
-        // 编辑现有消息
-        newMessage = {
-          ...editingMessage,
-          ...values,
-          date: values.date.format('YYYY-MM-DD HH:mm:ss')
-        };
-        const updatedMessages = messages.map(message => 
-          message.id === editingMessage.id ? newMessage : message
-        );
-        setMessages(updatedMessages);
-        message.success('编辑成功');
+        // 编辑现有消息：PUT /crypto-news（需要传递ID）
+        await api.put(NEWS_API, {
+          ...submitData,
+          id: Number(editingMessage.id) // 转Long类型适配后端
+        });
+        messageApi.success('编辑成功');
       } else {
-        // 添加新消息
-        newMessage = {
-          ...values,
-          id: Date.now().toString(),
-          date: values.date.format('YYYY-MM-DD HH:mm:ss')
-        };
-        const updatedMessages = [newMessage, ...messages];
-        setMessages(updatedMessages);
-        message.success('添加成功');
+        // 添加新消息：POST /crypto-news
+        await api.post(NEWS_API, submitData);
+        messageApi.success('添加成功');
       }
       
       handleAddModalClose();
-    }).catch(errorInfo => {
-      console.log('表单验证失败:', errorInfo);
-    });
+      // 重新获取列表，同步最新数据
+      fetchMessageList();
+    } catch (error) {
+      console.log('表单提交失败:', error);
+      console.log('错误详情:', JSON.stringify(error, null, 2));
+      // 验证失败时不提示重复的错误信息
+      if (!error?.toString().includes('ValidateError')) {
+        // 根据不同错误类型显示更具体的错误信息
+        if (error && typeof error === 'object' && 'response' in error && (error as any).response?.status === 401) {
+          messageApi.error('认证失败，请重新登录');
+        } else if (error && typeof error === 'object' && 'response' in error && (error as any).response?.status === 403) {
+          messageApi.error('权限不足，无法操作');
+        } else if ((error as any)?.response?.status === 400) {
+          messageApi.error('请求参数错误，请检查表单内容');
+        } else {
+          messageApi.error('操作失败，请检查表单内容');
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className={styles.container}>
-      <Card 
-        title="消息列表" 
-        className={styles.messageCard}
-        extra={
-          userRole === 'admin' && (
-            <Button 
-              type="primary" 
-              icon={<PlusOutlined />} 
-              onClick={() => setAddModalVisible(true)}
-            >
-              添加消息
-            </Button>
-          )
-        }
-      >
-        {/* 筛选栏 */}
-        <div className={styles.filterBar}>
-          <Space wrap size="middle">
-            <Input
-              placeholder="搜索标题或内容"
-              prefix={<SearchOutlined />}
-              value={searchText}
-              onChange={handleSearch}
-              style={{ width: 300 }}
-            />
-            
-            <Select
-              placeholder="选择数字货币类型"
-              style={{ width: 150 }}
-              value={selectedCrypto}
-              onChange={handleCryptoChange}
-            >
-              <Option value="">全部</Option>
-              <Option value="BTC">比特币(BTC)</Option>
-              <Option value="ETH">以太坊(ETH)</Option>
-              <Option value="DOGE">狗狗币(DOGE)</Option>
-              <Option value="SOL">Solana(SOL)</Option>
-              <Option value="ADA">Cardano(ADA)</Option>
-            </Select>
-            
-            <Select
-              placeholder="选择情绪"
-              style={{ width: 120 }}
-              value={selectedSentiment}
-              onChange={handleSentimentChange}
-            >
-              <Option value="">全部</Option>
-              <Option value="positive">利好</Option>
-              <Option value="negative">利空</Option>
-              <Option value="neutral">中性</Option>
-            </Select>
-            
-            <Button onClick={handleResetFilters}>重置筛选</Button>
-            
-            <Select
-              placeholder="切换角色"
-              style={{ width: 120 }}
-              value={userRole}
-              onChange={(value) => setUserRole(value as UserRole)}
-            >
-              <Option value="viewer">普通查看员</Option>
-              <Option value="admin">管理员</Option>
-            </Select>
-          </Space>
-        </div>
-
-        {/* 消息表格 */}
-        <Table
-          columns={columns}
-          dataSource={filteredMessages}
-          rowKey="id"
-          pagination={{ pageSize: 10 }}
-          className={styles.messageTable}
-          scroll={{ x: 1000 }}
-        />
-      </Card>
-
-      {/* 消息详情弹窗 */}
-      <Modal
-        title="消息详情"
-        open={detailModalVisible}
-        onCancel={handleCloseModal}
-        footer={null}
-        width={800}
-      >
-        {selectedMessage && (
-          <div className={styles.detailContainer}>
-            <h2 className={styles.detailTitle}>{selectedMessage.title}</h2>
-            <div className={styles.detailMeta}>
-              <Tag color={selectedMessage.cryptoType === 'ALL' ? 'default' : 'blue'}>
-                {selectedMessage.cryptoType}
-              </Tag>
-              <Tag 
-                color={
-                  selectedMessage.sentiment === 'positive' ? 'green' : 
-                  selectedMessage.sentiment === 'negative' ? 'red' : 'default'
-                }
+    <ConfigProvider> {/* 修复message静态方法警告 */}
+      {contextHolder}
+      <div className={styles.container}>
+        <Card 
+          title="消息列表" 
+          className={styles.messageCard}
+          extra={
+            userRole === 'admin' && (
+              <Button 
+                type="primary" 
+                icon={<PlusOutlined />} 
+                onClick={handleAddModalOpen}
               >
-                {selectedMessage.sentiment === 'positive' ? '利好' : 
-                 selectedMessage.sentiment === 'negative' ? '利空' : '中性'}
-              </Tag>
-              <span className={styles.detailDate}>{selectedMessage.date}</span>
-              <span className={styles.detailSource}>来源：{selectedMessage.source}</span>
-            </div>
-            <div className={styles.detailContent}>
-              {selectedMessage.content}
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* 添加/编辑消息弹窗 */}
-      <Modal
-        title={editingMessage ? "编辑消息" : "添加消息"}
-        open={addModalVisible || editModalVisible}
-        onCancel={handleAddModalClose}
-        onOk={handleFormSubmit}
-        width={600}
-      >
-        <Form
-          form={form}
-          layout="vertical"
-          initialValues={{
-            date: moment()
-          }}
+                添加消息
+              </Button>
+            )
+          }
         >
-          <Form.Item
-            name="title"
-            label="标题"
-            rules={[{ required: true, message: '请输入标题' }]}
-          >
-            <Input placeholder="请输入消息标题" />
-          </Form.Item>
+          {/* 筛选栏 */}
+          <div className={styles.filterBar}>
+            <Space wrap size="middle">
+              <Input
+                placeholder="搜索标题或内容"
+                prefix={<SearchOutlined />}
+                value={searchText}
+                onChange={handleSearch}
+                style={{ width: 300 }}
+                allowClear // 新增：清空按钮
+              />
+              
+              <Select
+                placeholder="选择数字货币类型"
+                style={{ width: 150 }}
+                value={selectedCrypto}
+                onChange={handleCryptoChange}
+                allowClear
+              >
+                <Option value="">全部</Option>
+                <Option value="BTC">比特币(BTC)</Option>
+                <Option value="ETH">以太坊(ETH)</Option>
+                <Option value="DOGE">狗狗币(DOGE)</Option>
+                <Option value="SOL">Solana(SOL)</Option>
+                <Option value="ADA">Cardano(ADA)</Option>
+              </Select>
+              
+              <Select
+                placeholder="选择情绪"
+                style={{ width: 120 }}
+                value={selectedSentiment}
+                onChange={handleSentimentChange}
+                allowClear
+              >
+                <Option value="">全部</Option>
+                <Option value="positive">利好</Option>
+                <Option value="negative">利空</Option>
+                <Option value="neutral">中性</Option>
+              </Select>
+              
+              <Button onClick={handleResetFilters}>重置筛选</Button>
+              
+              <Select
+                placeholder="切换角色"
+                style={{ width: 120 }}
+                value={userRole}
+                onChange={(value) => setUserRole(value as UserRole)}
+              >
+                <Option value="viewer">普通查看员</Option>
+                <Option value="admin">管理员</Option>
+              </Select>
+            </Space>
+          </div>
 
-          <Form.Item
-            name="content"
-            label="内容"
-            rules={[{ required: true, message: '请输入内容' }]}
-          >
-            <Input.TextArea rows={4} placeholder="请输入消息内容" />
-          </Form.Item>
+          {/* 消息表格 */}
+          <Table
+            columns={columns as (TableColumnGroupType<Message> | TableColumnType<Message>)[]}
+            dataSource={filteredMessages}
+            rowKey="id"
+            pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: ['5', '10', '20'] }}
+            className={styles.messageTable}
+            scroll={{ x: 1000 }}
+            loading={loading}
+            // 无数据时显示提示
+            locale={{ emptyText: loading ? '加载中...' : '暂无匹配的消息数据' }}
+          />
+        </Card>
 
-          <Form.Item
-            name="cryptoType"
-            label="数字货币类型"
-            rules={[{ required: true, message: '请选择数字货币类型' }]}
-          >
-            <Select placeholder="请选择数字货币类型">
-              <Option value="ALL">全部</Option>
-              <Option value="BTC">比特币(BTC)</Option>
-              <Option value="ETH">以太坊(ETH)</Option>
-              <Option value="DOGE">狗狗币(DOGE)</Option>
-              <Option value="SOL">Solana(SOL)</Option>
-              <Option value="ADA">Cardano(ADA)</Option>
-            </Select>
-          </Form.Item>
+        {/* 消息详情弹窗 */}
+        <Modal
+          title="消息详情"
+          open={detailModalVisible}
+          onCancel={handleCloseModal}
+          footer={null}
+          width={800}
+          destroyOnClose // 关闭时销毁内容，避免缓存
+        >
+          {selectedMessage ? (
+            <div className={styles.detailContainer}>
+              <h2 className={styles.detailTitle}>{selectedMessage.title || '-'}</h2>
+              <div className={styles.detailMeta}>
+                <Tag color={selectedMessage.cryptoType === 'ALL' ? 'default' : 'blue'}>
+                  {selectedMessage.cryptoType || '-'}
+                </Tag>
+                <Tag 
+                  color={
+                    selectedMessage.sentiment === 'positive' ? 'green' : 
+                    selectedMessage.sentiment === 'negative' ? 'red' : 'default'
+                  }
+                >
+                  {selectedMessage.sentiment === 'positive' ? '利好' : 
+                   selectedMessage.sentiment === 'negative' ? '利空' : '中性'}
+                </Tag>
+                <span className={styles.detailDate}>{selectedMessage.date || '-'}</span>
+                <span className={styles.detailSource}>来源：{selectedMessage.source || '-'}</span>
+              </div>
+              <div className={styles.detailContent}>
+                {selectedMessage.content || '无内容'}
+              </div>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: 40 }}>暂无详情数据</div>
+          )}
+        </Modal>
 
-          <Form.Item
-            name="sentiment"
-            label="情绪"
-            rules={[{ required: true, message: '请选择情绪' }]}
+        {/* 添加/编辑消息弹窗 */}
+        <Modal
+          title={editingMessage ? "编辑消息" : "添加消息"}
+          open={addModalVisible || editModalVisible}
+          onCancel={handleAddModalClose}
+          onOk={handleFormSubmit}
+          width={600}
+          destroyOnClose
+          // 防止重复提交
+          okButtonProps={{ loading: loading }}
+        >
+          <Form
+            form={form}
+            layout="vertical"
+            initialValues={{
+              date: moment(),
+              cryptoType: 'ALL',
+              sentiment: 'neutral'
+            }}
+            validateMessages={{
+              required: '${label}为必填项',
+            }}
           >
-            <Select placeholder="请选择情绪">
-              <Option value="positive">利好</Option>
-              <Option value="negative">利空</Option>
-              <Option value="neutral">中性</Option>
-            </Select>
-          </Form.Item>
+            <Form.Item
+              name="title"
+              label="标题"
+              rules={[{ required: true, max: 100, message: '标题不能为空且长度不超过100字' }]}
+            >
+              <Input placeholder="请输入消息标题" maxLength={100} />
+            </Form.Item>
 
-          <Form.Item
-            name="date"
-            label="发布时间"
-            rules={[{ required: true, message: '请选择发布时间' }]}
-          >
-            <DatePicker 
-              showTime 
-              format="YYYY-MM-DD HH:mm:ss" 
-              style={{ width: '100%' }}
-            />
-          </Form.Item>
+            <Form.Item
+              name="content"
+              label="内容"
+              rules={[{ required: true, message: '请输入内容' }]}
+            >
+              <Input.TextArea rows={4} placeholder="请输入消息内容" maxLength={1000} showCount />
+            </Form.Item>
 
-          <Form.Item
-            name="source"
-            label="来源"
-            rules={[{ required: true, message: '请输入来源' }]}
-          >
-            <Input placeholder="请输入消息来源" />
-          </Form.Item>
-        </Form>
-      </Modal>
-    </div>
+            <Form.Item
+              name="cryptoType"
+              label="数字货币类型"
+              rules={[{ required: true, message: '请选择数字货币类型' }]}
+            >
+              <Select placeholder="请选择数字货币类型">
+                <Option value="ALL">全部</Option>
+                <Option value="BTC">比特币(BTC)</Option>
+                <Option value="ETH">以太坊(ETH)</Option>
+                <Option value="DOGE">狗狗币(DOGE)</Option>
+                <Option value="SOL">Solana(SOL)</Option>
+                <Option value="ADA">Cardano(ADA)</Option>
+              </Select>
+            </Form.Item>
+
+            <Form.Item
+              name="sentiment"
+              label="情绪"
+              rules={[{ required: true, message: '请选择情绪' }]}
+            >
+              <Select placeholder="请选择情绪">
+                <Option value="positive">利好</Option>
+                <Option value="negative">利空</Option>
+                <Option value="neutral">中性</Option>
+              </Select>
+            </Form.Item>
+
+            <Form.Item
+              name="date"
+              label="发布时间"
+              rules={[{ required: true, message: '请选择发布时间' }]}
+            >
+              <DatePicker 
+                showTime
+                format="YYYY-MM-DD HH:mm:ss" 
+                style={{ width: '100%' }}
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="source"
+              label="来源"
+              rules={[{ required: true, max: 50, message: '来源不能为空且长度不超过50字' }]}
+            >
+              <Input placeholder="请输入消息来源" maxLength={50} />
+            </Form.Item>
+          </Form>
+        </Modal>
+      </div>
+    </ConfigProvider>
   );
-};
+}
 
 export default MessageList;

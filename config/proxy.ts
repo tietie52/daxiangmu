@@ -12,14 +12,25 @@
 export default {
   // 如果需要自定义本地开发服务器  请取消注释按需调整
   dev: {
-    // localhost:8000/api/** -> https://preview.pro.ant.design/api/**
-    '/api/': {
+    // localhost:8000/api/** -> http://localhost:8080/**
+    '/api/**': {
       // 要代理的地址
       target: 'http://localhost:8080',
       // 配置了这个可以从 http 代理到 https
       // 依赖 origin 的功能可能需要这个，比如 cookie
       changeOrigin: true,
+      // 重写路径：移除/api前缀
       pathRewrite: { '^/api': '' },
+      // 支持所有以/api开头的路径
+      secure: false,
+      ws: true,
+      // 确保所有/api请求都被代理
+      bypass: function(req: any, res: any, proxyOptions: any) {
+        // 不代理静态资源请求
+        if (req.headers.accept && req.headers.accept.indexOf('html') !== -1) {
+          return '/index.html';
+        }
+      }
     },
     '/profile/avatar/': {
       target: 'http://localhost:8080',

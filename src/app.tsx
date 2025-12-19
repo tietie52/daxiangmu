@@ -99,7 +99,7 @@ export const layout: RunTimeLayoutConfig = ({ initialState, setInitialState }) =
         return routes.map(route => ({
           path: route.path,
           name: route.name,
-          icon: route.icon,
+          ...(route as any).icon ? { icon: (route as any).icon } : {},
           routes: route.routes || []
         })).filter(menu => menu.path !== '*'); // 过滤掉404路由
       }
@@ -220,7 +220,7 @@ export const request = {
   ...errorConfig,
   requestInterceptors: [
     (url: any, options: { headers: any }) => {
-      const headers = options.headers ? options.headers : [];
+      const headers = options.headers ? options.headers : {};
       const authHeader = headers['Authorization'];
       const isToken = headers['isToken'];
       if (!authHeader && isToken !== false) {

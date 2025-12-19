@@ -61,6 +61,7 @@
     "@umijs/route-utils": "^4.0.1",
     "antd": "^5.22.0",
     "antd-style": "^3.6.2",
+    "axios": "^1.13.2",
     "classnames": "^2.5.1",
     "dayjs": "^1.11.13",
     "fabric": "^6.4.0",
