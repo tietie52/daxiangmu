@@ -8,7 +8,7 @@ import {
   TableColumnType, TableColumnGroupType
 } from 'antd';
 import {
-  SearchOutlined, EyeOutlined, PlusOutlined, EditOutlined, DeleteOutlined
+  SearchOutlined, EyeOutlined, PlusOutlined, EditOutlined, DeleteOutlined, SyncOutlined
 } from '@ant-design/icons';
 import styles from './index.less';
 
@@ -67,6 +67,38 @@ const MessageList: React.FC = () => {
     if (!dateStr) return '';
     // 兼容LocalDateTime格式（2025-12-19T10:00:00）和普通格式
     return moment(dateStr).format('YYYY-MM-DD HH:mm:ss');
+  };
+
+  // 同步Dify资讯方法
+  const handleSyncDifyNews = async () => {
+    try {
+      setLoading(true);
+      // 发送POST请求到同步接口
+      const response = await api.post(`${NEWS_API}/syncFromDify`);
+      
+      // 请求成功
+      setLoading(false);
+      // 显示后端返回的成功消息
+      const responseData = response as any;
+      messageApi.success(responseData?.msg || '同步成功');
+      // 自动刷新列表
+      fetchMessageList();
+    } catch (error: any) {
+      console.error('同步Dify资讯失败:', error);
+      setLoading(false);
+      
+      // 处理不同类型的错误
+      if (error?.response?.data?.msg) {
+        // 后端返回的错误信息
+        messageApi.error(error.response.data.msg);
+      } else if (error?.message) {
+        // axios错误信息
+        messageApi.error(`同步失败：${error.message}`);
+      } else {
+        // 未知错误
+        messageApi.error('同步失败：网络异常，请稍后重试');
+      }
+    }
   };
 
   // 从后端获取消息列表（适配若依分页接口）
@@ -437,13 +469,25 @@ const MessageList: React.FC = () => {
           className={styles.messageCard}
           extra={
             userRole === 'admin' && (
-              <Button 
-                type="primary" 
-                icon={<PlusOutlined />} 
-                onClick={handleAddModalOpen}
-              >
-                添加消息
-              </Button>
+              <Space>
+                {/* 同步Dify资讯按钮 */}
+                <Button 
+                  type="primary" 
+                  icon={<SyncOutlined />} 
+                  onClick={handleSyncDifyNews}
+                  loading={loading}
+                >
+                  同步Dify资讯（5条）
+                </Button>
+                {/* 添加消息按钮 */}
+                <Button 
+                  type="primary" 
+                  icon={<PlusOutlined />} 
+                  onClick={handleAddModalOpen}
+                >
+                  添加消息
+                </Button>
+              </Space>
             )
           }
         >
