@@ -1,0 +1,11 @@
+# CREATE TABLE `newtable` (
+#   `id` int NOT NULL AUTO_INCREMENT,
+#   `rank` int NOT NULL,
+#   `name` varchar(100) NOT NULL,
+#   `symbol` varchar(20) NOT NULL,
+#   `price` decimal(10,3) NOT NULL,
+#   `change_percent` decimal(3,2) NOT NULL,
+#   `trend` enum('up','down') NOT NULL,
+#   `date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+#   PRIMARY KEY (`id`)
+# ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
