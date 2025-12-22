@@ -61,6 +61,10 @@ const MessageList: React.FC = () => {
   const [messageApi, contextHolder] = message.useMessage();
   const [userRole, setUserRole] = useState<UserRole>('admin'); 
   const [loading, setLoading] = useState<boolean>(false); // 加载状态
+  // 分页状态管理
+  const [currentPage, setCurrentPage] = useState<number>(1); // 当前页码
+  const [pageSize, setPageSize] = useState<number>(10); // 每页条数
+  const [total, setTotal] = useState<number>(0); // 总数据量
 
   // 时间格式化工具函数（适配后端LocalDateTime）
   const formatDateTime = (dateStr: string) => {
@@ -106,10 +110,10 @@ const MessageList: React.FC = () => {
     try {
       setLoading(true);
       // 调用后端分页查询接口：GET /crypto-news/list
-      // 传递分页参数（默认第1页，每页10条）
+      // 传递当前分页参数
       const pageQuery = {
-        pageNum: 1,
-        pageSize: 10
+        pageNum: currentPage,
+        pageSize: pageSize
       };
       const response = await api.get(`${NEWS_API}/list`, {
         params: pageQuery
@@ -122,9 +126,10 @@ const MessageList: React.FC = () => {
       // 后端返回格式：{total: 3, rows: [...], code: 200, msg: "查询成功"}
       // 数据直接在response对象中，而不是在response.data中
       const messageList = response?.rows || [];
+      const totalCount = response?.total || 0;
       
       console.log('解析到的原始rows数据:', messageList);
-      console.log('最终的消息列表:', messageList);
+      console.log('解析到的total数据:', totalCount);
       
       // 字段映射：后端 → 前端
       const formattedList = messageList.map((item: any) => ({
@@ -148,6 +153,7 @@ const MessageList: React.FC = () => {
       
       setMessages(sortedMessages);
       setFilteredMessages(sortedMessages);
+      setTotal(totalCount); // 设置总数据量
       
       // 无数据时提示
       if (sortedMessages.length === 0) {
@@ -158,15 +164,16 @@ const MessageList: React.FC = () => {
       // 失败时回退到空数组，避免页面报错
       setMessages([]);
       setFilteredMessages([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
   };
 
-  // 初始化数据：从后端加载
+  // 初始化数据：从后端加载，监听分页状态变化
   useEffect(() => {
     fetchMessageList();
-  }, []);
+  }, [currentPage, pageSize]);
 
   // 筛选功能
   useEffect(() => {
@@ -476,14 +483,28 @@ const MessageList: React.FC = () => {
                   icon={<SyncOutlined />} 
                   onClick={handleSyncDifyNews}
                   loading={loading}
+                  size="middle"
+                  shape="round"
+                  style={{ 
+                    background: 'linear-gradient(135deg, #1890ff 0%, #722ed1 100%)',
+                    border: 'none',
+                    fontWeight: 'bold'
+                  }}
                 >
-                  同步Dify资讯（5条）
+                  同步Dify资讯
                 </Button>
                 {/* 添加消息按钮 */}
                 <Button 
                   type="primary" 
                   icon={<PlusOutlined />} 
                   onClick={handleAddModalOpen}
+                  size="middle"
+                  shape="round"
+                  style={{ 
+                    background: 'linear-gradient(135deg, #52c41a 0%, #13c2c2 100%)',
+                    border: 'none',
+                    fontWeight: 'bold'
+                  }}
                 >
                   添加消息
                 </Button>
@@ -545,12 +566,33 @@ const MessageList: React.FC = () => {
             </Space>
           </div>
 
+          {/* 总数据量显示 */}
+          <div style={{ margin: '10px 0', fontSize: '14px', color: '#666' }}>
+            共 <strong>{total}</strong> 条数据
+          </div>
+
           {/* 消息表格 */}
           <Table
             columns={columns as (TableColumnGroupType<Message> | TableColumnType<Message>)[]}
             dataSource={filteredMessages}
             rowKey="id"
-            pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: ['5', '10', '20'] }}
+            pagination={{ 
+              current: currentPage, 
+              pageSize: pageSize, 
+              total: total, 
+              showSizeChanger: true, 
+              pageSizeOptions: ['5', '10', '20'],
+              onChange: (page, pageSize) => {
+                setCurrentPage(page);
+                setPageSize(pageSize);
+                fetchMessageList();
+              },
+              onShowSizeChange: (current, size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+                fetchMessageList();
+              }
+            }}
             className={styles.messageTable}
             scroll={{ x: 1000 }}
             loading={loading}
